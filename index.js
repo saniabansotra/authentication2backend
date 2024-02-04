@@ -1,118 +1,167 @@
 const express = require("express");
 const app = express();
 app.use(express.json());
-const USER_MODEL = require("./model/usermodel");
-const { connectDatabase } = require("./connection/connect");
-
+const mongoose = require("mongoose");
 const cookies = require("cookie-parser");
+const generatetoken = require("./tokens/generateToken");
+const verifytoken = require("./tokens/verifyToken");
+const jwt = require("jsonwebtoken");
+
 app.use(cookies());
-const verifyToken = require("./tokens/verifyToken");
-const generateToken = require("./tokens/generateToken");
+const { connectDatabase } = require("./connection/connect");
+const USERS_MODEL = require("./model/usermodel");
 const { encrytPassword, verifyPassword } = require("./functions/encryption");
 const { sendLoginOtp, verifyOtp } = require("./functions/otp");
 
 app.post("/signup", async (req, res) => {
   try {
-    const user = new USER_MODEL({
+    const newuser = {
+      email: req.body.email.toLowerCase(),
       name: req.body.name,
-      email: req.body.name,
       password: await encrytPassword(req.body.password),
       date: req.body.date,
       phonenumber: req.body.phonenumber,
       isUnder18: req.body.isUnder18,
-    });
-    const checkuser = await USER_MODEL.findOne({
+    };
+    let checkemail = await USERS_MODEL.findOne({
       email: req.body.email.toLowerCase(),
     });
-    if (!checkuser) {
-      await user.save();
-      return res.json({ success: true, message: "Signed Up success" });
+    // console.log(checkemail);
+    if (!checkemail) {
+      const clients = new USERS_MODEL(newuser);
+      await clients.save();
+      return res.json({ success: true, message: "Data Saved successfully" });
+    } else {
+      return res.json({ success: false, message: "User already" });
     }
-
-    return res.json({ success: false, error: "user already registered" });
   } catch (error) {
     return res.json({ success: false, error: error.message });
   }
 });
-app.post("/login", async (req, res) => {
+
+app.post("/api/login", async (req, res) => {
   try {
-    let email = req.body.email;
-    let inputPassword = req.body.password;
-    const checkUser = await USER_MODEL.findOne({ email: email });
-    if (!checkUser) {
+    // console.log(req.body);
+
+    let inputpassword = req.body.userpassword;
+    const checkuser = await USERS_MODEL.findOne({
+      email: req.body.email,
+    });
+
+    // if (check_password && check_name)
+    if (!checkuser) {
+      return res.json({ success: fasle, message: "user not exist" });
+    }
+    let originalpassword = checkuser.userpassword;
+    console.log(inputpassword);
+    console.log(originalpassword);
+    if (await verifyPassword(inputpassword, originalpassword)) {
+      sendLoginOtp(`+91${checkuser.phonenumber}`);
+      // const u_id = checkuser.userid;
+      // const token = generatetoken(u_id);
+      // console.log(token);
+      // res.cookie("web_tk", token);
       return res.json({
-        success: false,
-        error: "User not found, please signup first",
+        success: true,
+        message: "cookie generated successfully",
       });
-    }
-    let originalPassword = checkUser.password;
-    if (await verifyPassword(inputPassword, originalPassword)) {
-      sendLoginOtp(`+91${checkUser.phonenumber}`);
-      return res.json({ success: true, message: "Please enter OTP to login" });
     } else {
-      return res
-        .status(400)
-        .json({ success: false, error: "Incorrect Password" });
-    }
-  } catch (error) {
-    return res.json({ success: false, message: error.message });
-  }
-});
-const checkIfUserLoggedIn = (req, res, next) => {
-  if (verifyToken(req.cookies.auth_tk)) {
-    const userinfo = verifyToken(req.cookies.auth_tk);
-    req.userid = userinfo.id;
-    next();
-  } else {
-    return res.status(401).json({ success: false, error: "UNAUTHORIZED" });
-  }
-};
-app.post("/mfaverify", async (req, res) => {
-  try {
-    let email = req.body.email;
-    let inputPassword = req.body.password;
-    const checkUser = await USER_MODEL.findOne({ email: email });
-    if (!checkUser) {
-      return res.json({
-        success: false,
-        error: "User not found, please signup first",
-      });
-    }
-    let originalPassword = checkUser.password;
-    if (
-      (await verifyPassword(inputPassword, originalPassword)) &&
-      (await verifyOtp(`+91${checkUser.phonenumber}`, code))
-    ) {
-      const token = generateToken(checkUser._id);
-      res.cookie("auth_tk", token);
-      return res.json({ success: true, message: "Logged in success" });
-    } else {
-      return res
-        .status(400)
-        .json({ success: false, error: "Incorrect Credentials" });
-    }
-  } catch (error) {
-    return res.json({ success: true, message: error.message });
-  }
-});
-app.get("/currentuser", checkIfUserLoggedIn, async (req, res) => {
-  try {
-    const userid = req.userid;
-    const userdetails = await USER_MODEL.findOne(
-      { _id: userid },
-      { email: 1, name: 1, dob: 1, isUnder18, createdAt: 1 }
-    );
-    if (userdetails) {
-      return res.json({ success: true, data: userdetails });
-    } else {
-      return res.json({ success: false, error: "User Not found" });
+      return res.json({ success: false, message: "Incorrect Password" });
     }
   } catch (error) {
     return res.json({ success: false, message: error.message });
   }
 });
 
+const middleware = (req, res, next) => {
+  if (verifytoken(req.cookies.web_tk)) {
+    const userinfo = verifytoken(req.cookies.web_tk);
+    req.userid = userinfo.id;
+    console.log(userinfo);
+    next();
+  } else {
+    return res.status(400).json({ success: false, error: "UNUTHORIZED" });
+  }
+};
+// app.get("/savedposts", checkIfUserLoggedIn, (req, res) => {
+//   try {
+//     let loggedId = req.userid;
+//     let notifications = {
+//       "65aaaa10b10198488ee3434": "Notificaiton 1",
+//       "65aaaa10b10198488e4546": "Notification 22",
+//       "65aaaa10b10198488ee3e12f": "Notification of logged in user",
+//       "65abff80c224b1a6dbdcf629": "Notification of new user",
+//     };
+//     return res.json({ success: true, message: notifications[loggedId] });
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// });
+app.get("/getdata", middleware, (req, res) => {
+  try {
+    return res.json({ success: true, message: "fully authorized" });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
+  }
+});
+
+app.post("/mfa", async (req, res) => {
+  try {
+    let email = req.body.email;
+    let inputpassword = req.body.userpassword;
+    const checkUser = await USERS_MODEL.findOne({ email: email });
+    if (!checkUser) {
+      return res
+        .status(400)
+        .json({ success: false, error: "User not found, please signup first" });
+    }
+    let originalpassword = checkUser.userpassword;
+
+    if (
+      (await verifyPassword(inputpassword, originalpassword)) &&
+      (await verifyOtp(`+91${checkUser.phonenumber}`, "026698"))
+    ) {
+      const token = generatetoken(checkUser._id);
+      res.cookie("auth_tk", token);
+      return res.json({ success: true, message: "Logged in success" });
+    } else {
+      return res.status(400).json({ success: false, error: "Wrong Otp" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    let email = req.body.email;
+    let inputpassword = req.body.userpassword;
+    const checkUser = await USERS_MODEL.findOne({ email: email });
+    if (!checkUser) {
+      return res
+        .status(400)
+        .json({ success: false, error: "User not found, please signup first" });
+    }
+    let originalpassword = checkUser.userpassword;
+
+    if (await verifyPassword(inputpassword, originalpassword)) {
+      sendLoginOtp(`+91${checkUser.phonenumber}`);
+
+      // const token = generatetoken(checkUser._id);
+      // res.cookie("auth_tk", token);
+      return res.json({ success: true, message: "please enter otp" });
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, error: "Incorrect password" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
 connectDatabase();
-app.listen(8000, () => {
-  console.log("Server is running on port 8000");
+app.listen(5000, () => {
+  console.log("Server is running on port 5000");
 });
