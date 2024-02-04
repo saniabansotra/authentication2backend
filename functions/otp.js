@@ -1,6 +1,6 @@
 TWILIO_SERVICE_ID = "VAd3b2f78cfd86d1ab7c943cda02a85e9e"; //from the services->verify page
 TWILIO_ACCOUNT_ID = "ACc7ddb9563c9bf1cfb879df898b2ea121"; // account settings
-TWILIO_AUTH_TOKEN = "b428feddea839f1ef7f67b606a33563d"; // account settings below
+TWILIO_AUTH_TOKEN = "50994d0e8170d84253ed6b132c4f3bb1"; // account settings below
 
 const client = require("twilio")(TWILIO_ACCOUNT_ID, TWILIO_AUTH_TOKEN);
 

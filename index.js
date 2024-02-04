@@ -3,7 +3,7 @@ const app = express();
 app.use(express.json());
 const mongoose = require("mongoose");
 const cookies = require("cookie-parser");
-const generatetoken = require("./tokens/generateToken");
+const generatetoken = require("./tokens/generatetoken");
 const verifytoken = require("./tokens/verifyToken");
 const jwt = require("jsonwebtoken");
 
@@ -83,20 +83,7 @@ const middleware = (req, res, next) => {
     return res.status(400).json({ success: false, error: "UNUTHORIZED" });
   }
 };
-// app.get("/savedposts", checkIfUserLoggedIn, (req, res) => {
-//   try {
-//     let loggedId = req.userid;
-//     let notifications = {
-//       "65aaaa10b10198488ee3434": "Notificaiton 1",
-//       "65aaaa10b10198488e4546": "Notification 22",
-//       "65aaaa10b10198488ee3e12f": "Notification of logged in user",
-//       "65abff80c224b1a6dbdcf629": "Notification of new user",
-//     };
-//     return res.json({ success: true, message: notifications[loggedId] });
-//   } catch (error) {
-//     res.status(400).json({ success: false, error: error.message });
-//   }
-// });
+
 app.get("/getdata", middleware, (req, res) => {
   try {
     return res.json({ success: true, message: "fully authorized" });
@@ -108,18 +95,18 @@ app.get("/getdata", middleware, (req, res) => {
 app.post("/mfa", async (req, res) => {
   try {
     let email = req.body.email;
-    let inputpassword = req.body.userpassword;
+    let inputpassword = req.body.password;
     const checkUser = await USERS_MODEL.findOne({ email: email });
     if (!checkUser) {
       return res
         .status(400)
         .json({ success: false, error: "User not found, please signup first" });
     }
-    let originalpassword = checkUser.userpassword;
+    let originalpassword = checkUser.password;
 
     if (
       (await verifyPassword(inputpassword, originalpassword)) &&
-      (await verifyOtp(`+91${checkUser.phonenumber}`, "026698"))
+      (await verifyOtp(`+91${checkUser.phonenumber}`, "686182"))
     ) {
       const token = generatetoken(checkUser._id);
       res.cookie("auth_tk", token);
@@ -136,14 +123,14 @@ app.post("/mfa", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     let email = req.body.email;
-    let inputpassword = req.body.userpassword;
+    let inputpassword = req.body.password;
     const checkUser = await USERS_MODEL.findOne({ email: email });
     if (!checkUser) {
       return res
         .status(400)
         .json({ success: false, error: "User not found, please signup first" });
     }
-    let originalpassword = checkUser.userpassword;
+    let originalpassword = checkUser.password;
 
     if (await verifyPassword(inputpassword, originalpassword)) {
       sendLoginOtp(`+91${checkUser.phonenumber}`);
